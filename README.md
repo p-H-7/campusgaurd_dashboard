@@ -1,117 +1,176 @@
-# 📊 CampusGuard Security Dashboard
+# 🛡️ **CampusGuard-Demo**
 
-This is a **Streamlit-based live dashboard** for the CampusGuard system. It allows campus security personnel to receive and visualize real-time alerts from the Android app, including:
+A real-time, human-in-the-loop campus safety monitoring system that combines **on-device AI**, **operator validation**, and a **live security dashboard**.
 
-* Type of detected event (e.g., *Knife Detected*, *Person Down*, etc.)
-* Model confidence score
-* Operator verdict from the phone (**YES / MAYBE**)
-* Timestamp of the alert
-* Captured camera frame (screengrab) from the phone
+This project was built for a hackathon/demo setting to showcase:
+
+* Edge AI (on Android) for anomaly detection
+* Real-time alerts with evidence (camera frame)
+* A simple but functional security dashboard for campus personnel
 
 ---
 
-## 🔧 Architecture (High Level)
+## 🎯 **What CampusGuard Does**
+
+CampusGuard continuously analyzes camera footage on a mobile device and detects potentially suspicious or dangerous situations such as:
+
+* 🔪 **Knife detection**
+* 🧍 **Person down / lying position**
+* 🏃 **Rapid movement (running)**
+* 👥 **Other person-based anomalies**
+
+When the AI flags something as suspicious, the operator (security guard or user) can confirm it via a simple UI:
+
+* **YES (Definitely suspicious)**
+* **MAYBE (Not sure)**
+* **NO (Ignore)**
+
+If YES or MAYBE is selected, an alert (with a screenshot) is sent to a **live security dashboard**.
+
+---
+
+## 🏗️ **System Architecture**
 
 ```
 Android App  -->  Node Alert Server  -->  Streamlit Dashboard
-(button press)      (stores alerts)       (polls & displays)
+(Edge AI + UI)      (Stores alerts)       (Live visualization)
 ```
 
-* The **Android app** sends alerts (JSON + Base64 image) when the operator presses a button.
-* The **Node/TypeScript server** receives and stores alerts and images.
-* The **Streamlit dashboard** polls the server and displays the latest alerts.
+### Component Breakdown
+
+### 📱 1) Android App (`android-app/`)
+
+Responsibilities:
+
+* Runs YOLOv8 ONNX model on-device using **ONNX Runtime**
+* Detects:
+
+  * Person-based anomalies
+  * Knife (COCO class 43)
+* Shows a confirmation popup when something suspicious is detected
+* Sends:
+
+  * Event type (e.g., "Knife Detected")
+  * Model confidence
+  * Operator verdict (YES/MAYBE)
+  * Screenshot of the frame
+
+**Key files:**
+
+* `InferenceEngine.kt` → AI model inference + knife detection
+* `CameraScreen.kt` → Camera feed + alert UI + sending alerts
+* `AlertSender.kt` → HTTP client that sends alerts to server
 
 ---
 
-## 🚀 Setup & Running the Dashboard
+### 🖥️ 2) Alert Server (`server/`)
 
-### 1️⃣ Install dependencies
+A lightweight **Node.js + TypeScript** backend that:
 
-From the `dashboard/` folder:
+* Receives alerts from the phone via HTTP POST
+* Stores:
+
+  * Event metadata in memory (for demo)
+  * Screenshot images on disk
+* Exposes:
+
+  * `POST /alert` → receive new alerts
+  * `GET /alerts` → return latest alerts
+  * `GET /images/{id}.jpg` → serve captured frames
+  * `GET /health` → server status check
+
+**Tech stack:** Express, TypeScript
+
+---
+
+### 📊 3) Security Dashboard (`dashboard/`)
+
+A **Streamlit (Python) web app** that:
+
+* Polls the Node server every few seconds
+* Displays alerts as cards with:
+
+  * Event type
+  * Confidence score
+  * Operator verdict (YES/MAYBE)
+  * Timestamp
+  * Captured frame from phone
+
+**Tech stack:** Streamlit, Python, Requests
+
+---
+
+## 📁 **Project Structure**
+
+```
+CampusGuard-Demo/
+│
+├── android-app/
+│   └── (Full Android Studio project)
+│
+├── server/
+│   ├── src/index.ts
+│   ├── data/images/
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── dashboard/
+│   ├── app.py
+│   └── .streamlit/secrets.toml
+│
+└── README.md   ← (this file)
+```
+
+---
+
+# 🚀 **HOW TO RUN EVERYTHING (DEMO DAY)**
+
+## ✅ **Step 1 — Run the Node Alert Server (IMPORTANT)**
+
+### **First time only — install dependencies**
+
+From the `server/` folder:
 
 ```bash
-pip install streamlit requests
+cd server
+npm install
 ```
 
----
+### **Start the server**
 
-### 2️⃣ Create Streamlit secrets
-
-Create a folder:
-
-```
-dashboard/.streamlit/
-```
-
-Inside it, create a file:
-
-```
-dashboard/.streamlit/secrets.toml
-```
-
-Add:
-
-```toml
-API_BASE = "http://localhost:8787"
-CAMPUSGUARD_TOKEN = "demo-token"
-```
-
-> 🔹 **Note:**
->
-> * `API_BASE` should point to your Node server.
-> * Use `localhost` if running Streamlit on the same laptop as the server.
-
----
-
-### 3️⃣ Run the dashboard
-
-From the `dashboard/` directory:
+#### **On Mac / Linux**
 
 ```bash
-streamlit run app.py
+CAMPUSGUARD_TOKEN=demo-token npm run dev
 ```
 
-The dashboard will open in your browser at:
+#### **On Windows (PowerShell) — Recommended**
 
-```
-http://localhost:8501
-```
+Run this **once**:
 
----
-
-## 🖥️ What You’ll See
-
-Each alert appears as a card containing:
-
-* 🚨 **Event Type** – What the model detected
-* 📱 **Device ID** – Which phone sent the alert
-* ⏱️ **Timestamp** – When it happened
-* 🎯 **Confidence** – Model confidence score
-* ✅ **Operator Verdict** – YES / MAYBE
-* 🖼️ **Captured Frame** – Screenshot from the phone (if available)
-
-Alerts auto-refresh every few seconds.
-
----
-
-## ⚙️ Configuration Options (in UI)
-
-On the dashboard you can adjust:
-
-* **Number of alerts to show**
-* **Refresh interval (seconds)**
-
----
-
-## 📡 Server Dependency
-
-This dashboard requires the **CampusGuard Alert Server** (Node/TypeScript) to be running at:
-
-```
-http://localhost:8787
+```powershell
+setx CAMPUSGUARD_TOKEN "demo-token"
 ```
 
-To check if the server is alive, visit:
+👉 Close and reopen the terminal, then run:
+
+```powershell
+cd CampusGuard-Demo/server
+npm run dev
+```
+
+> (If you don’t want to set the variable, you can just run `npm run dev` — the server defaults to `demo-token`.)
+
+You should see:
+
+```
+✅ Alert server running on http://localhost:8787
+Token header: x-campusguard-token = demo-token
+```
+
+### **Check server health**
+
+Open in browser:
 
 ```
 http://localhost:8787/health
@@ -120,21 +179,114 @@ http://localhost:8787/health
 You should see:
 
 ```json
-{"ok":true}
+{"ok": true}
+```
+
+### **Check from phone (real device)**
+
+If your laptop IP is `10.206.138.203`, open on your phone:
+
+```
+http://10.206.138.203:8787/health
+```
+
+If this works → your phone can talk to the server.
+
+---
+
+## ✅ **Step 2 — Run the Streamlit Dashboard**
+
+From the `dashboard/` folder:
+
+```bash
+cd dashboard
+streamlit run app.py
+```
+
+Open:
+
+```
+http://localhost:8501
 ```
 
 ---
 
-## 📱 Phone → Dashboard Flow
+## ✅ **Step 3 — Run the Android App**
 
-1. AI model detects anomaly on phone
-2. Operator presses **YES** or **MAYBE**
-3. Phone sends:
+* Connect a real Android phone (recommended for demo)
+* Make sure phone and laptop are on the **same Wi-Fi**
+* In `CameraScreen.kt`, set:
 
-   * Event type
-   * Confidence
-   * Verdict
-   * Screenshot
-4. Dashboard receives and displays the alert instantly
+```kotlin
+apiBase = "http://<YOUR_LAPTOP_IP>:8787"
+```
+
+Example:
+
+```kotlin
+apiBase = "http://10.206.138.203:8787"
+```
 
 ---
+
+## ✅ **Step 4 — End-to-End Test**
+
+1. Trigger a knife or anomaly detection in the app
+2. Tap **YES** or **MAYBE**
+3. The alert should appear **instantly** on the dashboard with a screenshot 🎉
+
+---
+
+## 🔐 Security (Demo-Level)
+
+This system uses a simple header-based token:
+
+```
+x-campusguard-token: demo-token
+```
+
+⚠️ This is **not production-grade security** — it’s for demo/hackathon purposes only.
+
+---
+
+## 🧠 AI Model Notes
+
+* Uses **YOLOv8 ONNX** for on-device inference
+* Knife detection relies on **COCO class index 43**
+* If your model is “person-only”, knife detection will **not work**
+* Frame processing is throttled (every 15 frames) to keep the app smooth
+
+---
+
+## ⚠️ Limitations (Honest Demo Notes)
+
+This is a **proof-of-concept**, not a production system:
+
+* Alerts are stored **in memory** (server restarts clear them)
+* No user authentication system
+* No database
+* No long-term logging
+* No advanced tracking or multi-object association
+
+---
+
+## 🏁 Hackathon Value Proposition
+
+CampusGuard demonstrates:
+
+* Edge AI + mobile computing
+* Real-time security workflow
+* Human-in-the-loop decision making
+* Cross-platform integration (Android + Web + Server)
+* Practical campus safety use case
+
+---
+
+## 👥 Team / Credits
+
+Built for a hackathon as a smart campus security solution using:
+
+* Android (Kotlin + Jetpack Compose)
+* ONNX Runtime + YOLOv8
+* Node.js + TypeScript
+* Streamlit (Python)
