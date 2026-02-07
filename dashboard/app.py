@@ -48,11 +48,10 @@ st.markdown(f"""
     /* Custom cards */
     .metric-card {{
         background: white;
-        border-radius: 10px;
+        border-radius: 12px;
         padding: 20px;
-        margin: 5px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border-left: 2px solid {COLORS['primary']};
+        border-left: 4px solid {COLORS['primary']};
         transition: transform 0.2s, box-shadow 0.2s;
     }}
     
@@ -529,7 +528,6 @@ with top_row[0]:
             f'</div>',
             unsafe_allow_html=True
         )
-    
     # Second row: Avg Confidence, Active Devices
     metric_row2 = st.columns([1, 1, 1])
     
@@ -606,85 +604,79 @@ with top_row[0]:
                         st.image(f"{API_BASE}/images/{img}", caption=f"Captured Frame - {event_type}", use_container_width=True)
                     except Exception as e:
                         st.warning(f"Could not load image: {e}")
-
+    
 # RIGHT COLUMN
-    with top_row[1]:
-        st.markdown('<h2 class="section-header">🤖 NPU AI Analysis</h2>', unsafe_allow_html=True)
+with top_row[1]:
+    st.markdown('<h2 class="section-header">🤖 NPU AI Analysis</h2>', unsafe_allow_html=True)
+    
+    current_time = time.time()
+    
+    if (current_time - st.session_state.last_analysis_time) >= analysis_interval:
+        st.session_state.last_analysis_time = current_time
+        with st.spinner("🧠 Analyzing with Snapdragon X Elite NPU..."):
+            try:
+                analysis = analyze_alerts_with_npu(alerts)
+                st.session_state.cached_analysis = analysis
+            except Exception as e:
+                st.error(f"❌ NPU Analysis Failed: {str(e)}")
+                st.stop()
+    
+    if st.session_state.cached_analysis:
+        analysis = st.session_state.cached_analysis
+        threat_level = analysis["threat_level"]
+        threat_class = f"threat-{threat_level.lower()}"
         
-        current_time = time.time()
+        st.markdown(
+            f'<div class="analysis-card">'
+            f'<div style="text-align: center; margin-bottom: 20px;">'
+            f'<span class="threat-badge {threat_class}" style="font-size: 1.2rem; padding: 12px 24px;">'
+            f'🎯 THREAT LEVEL: {threat_level}'
+            f'</span>'
+            f'</div>'
+            f'<div style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">'
+            f'<span style="color: {COLORS["primary"]}; font-weight: 600;">⚡ Powered by Snapdragon X Elite NPU</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
         
-        if (current_time - st.session_state.last_analysis_time) >= analysis_interval:
-            st.session_state.last_analysis_time = current_time
-            with st.spinner("🧠 Analyzing with Snapdragon X Elite NPU..."):
-                try:
-                    analysis = analyze_alerts_with_npu(alerts)
-                    st.session_state.cached_analysis = analysis
-                except Exception as e:
-                    st.error(f"❌ NPU Analysis Failed: {str(e)}")
-                    st.stop()
-        
-        if st.session_state.cached_analysis:
-            analysis = st.session_state.cached_analysis
-            threat_level = analysis["threat_level"]
-            threat_class = f"threat-{threat_level.lower()}"
-            
-            st.markdown(
-                f'<div class="analysis-card">'
-                f'<div style="text-align: center; margin-bottom: 20px;">'
-                f'<span class="threat-badge {threat_class}" style="font-size: 1.2rem; padding: 12px 24px;">'
-                f'🎯 THREAT LEVEL: {threat_level}'
-                f'</span>'
-                f'</div>'
-                f'<div style="background: rgba(99, 102, 241, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">'
-                f'<span style="color: {COLORS["primary"]}; font-weight: 600;">⚡ Powered by Snapdragon X Elite NPU</span>'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-            
-            st.markdown("### 📊 Assessment")
-            st.markdown(
-                f'<div style="background: {COLORS["light"]}; padding: 16px; border-radius: 8px; border-left: 4px solid {COLORS["info"]};">'
-                f'{analysis["summary"]}'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            st.markdown("### 📋 Recommended Actions")
-            for i, rec in enumerate(analysis["recommendations"], 1):
-                st.markdown(f'<div class="recommendation-item"><strong>{i}.</strong> {rec}</div>', unsafe_allow_html=True)
-            
-            if analysis.get("alert_security"):
-                st.markdown(
-                    f'<div style="background: {COLORS["danger"]}; color: white; padding: 16px; border-radius: 8px; margin-top: 16px; text-align: center; font-weight: 600;">'
-                    f'🚨 SECURITY ALERT - IMMEDIATE ATTENTION REQUIRED'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-            
-            next_update = max(0, analysis_interval - (current_time - st.session_state.last_analysis_time))
-            st.markdown(
-                f'<div style="text-align: center; margin-top: 20px; color: {COLORS["info"]}; font-size: 0.875rem;">'
-                f'Last Updated: {datetime.now().strftime("%H:%M:%S")}<br>'
-                f'Next Analysis: {int(next_update)}s'
-                f'</div>',
-                unsafe_allow_html=True
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown('<h2 class="section-header">📊 Live Alert Feed</h2>', unsafe_allow_html=True)
-        
-        timeline_fig = create_threat_timeline(alerts)
-        if timeline_fig:
-            st.plotly_chart(timeline_fig, use_container_width=True, key=f"timeline_{int(time.time())}")
+        st.markdown("### 📊 Assessment")
+        st.markdown(
+            f'<div style="background: {COLORS["light"]}; padding: 16px; border-radius: 8px; border-left: 4px solid {COLORS["info"]}; color: {COLORS["dark"]};">'
+            f'{analysis["summary"]}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        verdict_fig = create_verdict_distribution(alerts)
-        if verdict_fig:
-            st.plotly_chart(verdict_fig, use_container_width=True, key=f"verdict_{int(time.time())}")
+        st.markdown("### 📋 Recommended Actions")
+        for i, rec in enumerate(analysis["recommendations"], 1):
+            st.markdown(f'<div class="recommendation-item" style="color: {COLORS["dark"]}"><strong>{i}.</strong> {rec}</div>', unsafe_allow_html=True)
+        
+        if analysis.get("alert_security"):
+            st.markdown(
+                f'<div style="background: {COLORS["danger"]}; color: white; padding: 16px; border-radius: 8px; margin-top: 16px; text-align: center; font-weight: 600;">'
+                f'🚨 SECURITY ALERT - IMMEDIATE ATTENTION REQUIRED'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+        
+        next_update = max(0, analysis_interval - (current_time - st.session_state.last_analysis_time))
+        st.markdown(
+            f'<div style="text-align: center; margin-top: 20px; color: {COLORS["info"]}; font-size: 0.875rem;">'
+            f'Last Updated: {datetime.now().strftime("%H:%M:%S")}<br>'
+            f'Next Analysis: {int(next_update)}s'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">📊 Alert Timeline</h2>', unsafe_allow_html=True)
+    
+    timeline_fig = create_threat_timeline(alerts)
+    if timeline_fig:
+        st.plotly_chart(timeline_fig, use_container_width=True, key=f"timeline_{int(time.time())}")
 
 # Auto-refresh
 time.sleep(refresh_s)
